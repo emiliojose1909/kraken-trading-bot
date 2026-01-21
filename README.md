@@ -1,1 +1,386 @@
-# Bot de Trading Algorítmico para Kraken\n\n## Descripción\n\nBot de trading automatizado que implementa una estrategia híbrida de **Momentum-Reversion** optimizada para criptomonedas en Kraken. El bot utiliza análisis técnico avanzado, gestión de riesgos sofisticada y generación inteligente de señales para maximizar retornos.\n\n## Características Principales\n\n### Estrategia de Trading\n- **Análisis Multi-Timeframe**: Validación en 5m, 15m, 1h\n- **Indicadores Técnicos Avanzados**:\n  - Media Móvil Exponencial (EMA) adaptativa\n  - RSI dinámico con umbrales contextuales\n  - MACD para confirmación de momentum\n  - Bandas de Bollinger para extremos\n  - ATR para stops dinámicos\n  - ADX para fuerza de tendencia\n\n### Gestión de Riesgos\n- **Position Sizing Dinámico**: Basado en confianza de señal y riesgo\n- **Stops Dinámicos**: Calculados con ATR\n- **Take Profits Escalonados**: 3 niveles de cierre parcial\n- **Límites de Riesgo Global**:\n  - Máximo 5 posiciones simultáneas\n  - Máximo 10% del capital por posición\n  - Máximo 15% de drawdown\n  - Pausa después de 3 pérdidas consecutivas\n\n### Seguridad y Confiabilidad\n- Autenticación segura con Kraken API\n- Reintentos automáticos con backoff exponencial\n- Logging completo de todas las operaciones\n- Paper trading para validación sin riesgo\n- Manejo robusto de errores\n\n## Instalación\n\n### Requisitos\n- Python 3.8+\n- Pip\n- Cuenta en Kraken\n- API Keys de Kraken\n\n### Pasos\n\n1. **Clonar o descargar el proyecto**:\n```bash\ncd kraken_bot\n```\n\n2. **Instalar dependencias**:\n```bash\npip install -r requirements.txt\n```\n\n3. **Configurar credenciales de Kraken**:\n\nObtener API Keys desde https://www.kraken.com/c/account-settings/api\n\n```bash\nexport KRAKEN_API_KEY=\"tu_clave_publica\"\nexport KRAKEN_API_SECRET=\"tu_clave_privada\"\n```\n\nO crear archivo `.env`:\n```\nKRAKEN_API_KEY=tu_clave_publica\nKRAKEN_API_SECRET=tu_clave_privada\n```\n\n4. **Configurar bot** (opcional):\n\nEditar `bot_config.json` para ajustar parámetros:\n```json\n{\n  \"trading_pairs\": [\"XBTUSD\", \"ETHUSD\"],\n  \"total_capital\": 10000.0,\n  \"risk_per_trade\": 0.02,\n  \"paper_trading\": true\n}\n```\n\n## Uso\n\n### Iniciar el Bot\n\n```bash\npython trading_bot.py\n```\n\n### Paper Trading (Recomendado para Testing)\n\nPor defecto, el bot está configurado para paper trading (simulación sin dinero real).\n\nEn `bot_config.json`:\n```json\n{\n  \"paper_trading\": true\n}\n```\n\n### Trading Real\n\n**ADVERTENCIA**: Solo después de validación exhaustiva.\n\n```json\n{\n  \"paper_trading\": false\n}\n```\n\n## Configuración\n\n### Parámetros Principales\n\n| Parámetro | Descripción | Valor Defecto |\n|-----------|-------------|---------------|\n| `trading_pairs` | Pares a tradear | [\"XBTUSD\", \"ETHUSD\"] |\n| `total_capital` | Capital inicial | 10000.0 USD |\n| `risk_per_trade` | Riesgo por operación | 2% |\n| `max_positions` | Máximo posiciones abiertas | 5 |\n| `max_position_size` | Máximo % del capital por posición | 10% |\n| `max_drawdown` | Máximo drawdown permitido | 15% |\n| `min_confidence` | Confianza mínima para señal | 0.75 (75%) |\n| `atr_multiplier` | Multiplicador ATR para stops | 2.0 |\n| `paper_trading` | Modo simulación | true |\n\n### Parámetros de Indicadores\n\n```json\n{\n  \"rsi_oversold\": 30.0,\n  \"rsi_overbought\": 70.0,\n  \"adx_threshold\": 25.0,\n  \"volume_threshold\": 1.1\n}\n```\n\n## Arquitectura\n\n```\ntrading_bot.py (Bot Principal)\n├── kraken_client.py (Cliente API)\n│   └── Autenticación, órdenes, datos\n├── technical_analysis.py (Análisis Técnico)\n│   └── Indicadores, procesamiento de datos\n├── signal_generator.py (Generador de Señales)\n│   └── Lógica de trading, confianza\n└── risk_manager.py (Gestor de Riesgos)\n    └── Posiciones, stops, capital\n```\n\n## Monitoreo\n\n### Logs\n\nEl bot genera logs detallados en:\n- **Consola**: Información en tiempo real\n- **trading_bot.log**: Historial completo\n- **bot.log**: Logs del cliente API\n\n### Reporte\n\nAl detener el bot, se genera `trading_report.json` con:\n- Estadísticas de trading\n- Posiciones cerradas\n- PnL realizado\n- Métricas de rendimiento\n\n## Métricas de Rendimiento\n\nEl bot calcula automáticamente:\n\n- **Win Rate**: % de operaciones ganadoras\n- **Profit Factor**: Ganancias / Pérdidas\n- **Sharpe Ratio**: Retorno ajustado por riesgo\n- **Max Drawdown**: Máxima pérdida desde pico\n- **Total PnL**: Ganancia/Pérdida total realizada\n\n## Validación y Backtesting\n\n### Paper Trading\n\n1. Ejecutar en modo paper trading durante 1-2 semanas\n2. Validar estadísticas en `trading_report.json`\n3. Ajustar parámetros si es necesario\n\n### Backtesting Histórico\n\n```python\n# Implementar backtester (futuro)\nfrom backtester import Backtester\n\nbt = Backtester()\nbt.run(\"2023-01-01\", \"2024-01-01\")\nbt.print_report()\n```\n\n## Mejores Prácticas\n\n1. **Comenzar pequeño**: Iniciar con capital bajo\n2. **Paper trading primero**: Validar estrategia sin riesgo\n3. **Monitoreo activo**: Revisar logs regularmente\n4. **Ajustes graduales**: Cambiar un parámetro a la vez\n5. **Diversificación**: Tradear múltiples pares\n6. **Gestión de riesgos**: Nunca exceder límites configurados\n7. **Backup de datos**: Guardar logs y reportes\n\n## Solución de Problemas\n\n### Error: \"Credenciales de Kraken no encontradas\"\n\nVerificar que las variables de entorno están configuradas:\n```bash\necho $KRAKEN_API_KEY\necho $KRAKEN_API_SECRET\n```\n\n### Error: \"Rate limit exceeded\"\n\nEl bot implementa reintentos automáticos. Si persiste:\n- Reducir número de pares\n- Aumentar intervalo mínimo entre señales\n- Reducir frecuencia de monitoreo\n\n### Posiciones no se abren\n\nVerificar:\n1. Saldo disponible en Kraken\n2. Par de trading existe y está activo\n3. Configuración de paper_trading\n4. Logs para mensajes de error\n\n## Seguridad\n\n### Protección de Credenciales\n\n- **NUNCA** hardcodear API keys\n- Usar variables de entorno o archivo `.env`\n- Crear API keys con permisos limitados en Kraken\n- Habilitar 2FA en cuenta Kraken\n- Usar IP whitelist si está disponible\n\n### Límites de API Key\n\nEn Kraken, configurar API key con:\n- Permisos: Query Funds, Query Open Orders, Query Closed Orders, Query Trades, Create & Modify Orders, Cancel/Close Orders\n- IP Whitelist: Restringir a IP del servidor\n- 2FA: Habilitar si es posible\n\n## Limitaciones Conocidas\n\n1. **No soporta OCO**: Kraken no permite órdenes OCO simultáneas\n2. **Latencia**: Pequeño retraso entre señal y ejecución\n3. **Slippage**: Diferencia entre precio esperado y ejecutado\n4. **Comisiones**: Kraken cobra comisiones por operación\n\n## Roadmap Futuro\n\n- [ ] Backtester histórico completo\n- [ ] Machine learning para optimización\n- [ ] WebSocket para datos en tiempo real\n- [ ] Múltiples estrategias simultáneas\n- [ ] Dashboard web de monitoreo\n- [ ] Alertas por email/Telegram\n- [ ] Análisis de sentimiento\n- [ ] Optimización de parámetros automática\n\n## Soporte\n\n### Documentación\n- Kraken API: https://docs.kraken.com/rest/\n- Indicadores Técnicos: https://en.wikipedia.org/wiki/Technical_analysis\n\n### Contacto\n\nPara reportar bugs o sugerencias, crear issue en el repositorio.\n\n## Licencia\n\nMIT License - Ver LICENSE para detalles\n\n## Disclaimer\n\n**IMPORTANTE**: Este bot es para propósitos educativos. El trading de criptomonedas conlleva riesgos significativos. No se garantiza rentabilidad. El usuario es responsable de:\n\n- Validar la estrategia antes de trading real\n- Entender los riesgos del trading\n- Cumplir con regulaciones locales\n- Mantener backups de datos\n- Monitorear el bot regularmente\n\n**Usar bajo su propio riesgo.**\n\n## Cambios Recientes\n\n### v1.0.0 (2024-01-21)\n- Implementación inicial\n- Estrategia Momentum-Reversion\n- Gestión de riesgos completa\n- Paper trading\n- Logging y reportes\n\n---\n\n**Última actualización**: 2024-01-21\n
+# 🤖 Bot de Trading Algorítmico para Kraken
+
+[![Python](https://img.shields.io/badge/Python-3.8%2B-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/Status-Production-success.svg)]()
+
+Bot de trading algorítmico profesional para Kraken con estrategia **Momentum-Reversion híbrida**, análisis técnico avanzado y gestión de riesgos sofisticada.
+
+---
+
+## 🎯 Características Principales
+
+- ✅ **Estrategia Momentum-Reversion Híbrida** - Validación multi-indicador
+- ✅ **6 Indicadores Técnicos** - EMA, RSI, MACD, Bandas de Bollinger, ATR, ADX
+- ✅ **Gestión de Riesgos Sofisticada** - Position sizing dinámico, stops y take profits escalonados
+- ✅ **Paper Trading** - Validar sin dinero real
+- ✅ **Backtesting con Datos Reales** - Descarga automática de Kraken
+- ✅ **19 Pruebas Unitarias** - Código validado
+- ✅ **Documentación Exhaustiva** - 9 guías completas
+
+---
+
+## 🚀 Inicio Rápido (5 minutos)
+
+```bash
+# 1. Clonar repositorio
+git clone https://github.com/emiliojose1909/kraken-trading-bot.git
+cd kraken-trading-bot
+
+# 2. Instalar dependencias
+pip install -r requirements.txt
+
+# 3. Configurar credenciales
+cat > .env << EOF
+KRAKEN_API_KEY=tu_api_key
+KRAKEN_API_SECRET=tu_private_key
+EOF
+
+# 4. Ejecutar en paper trading
+python trading_bot.py
+```
+
+**Ver guía completa:** [QUICK_START_5MIN.md](QUICK_START_5MIN.md)
+
+---
+
+## 📊 Estrategia de Trading
+
+### Indicadores Técnicos
+
+| Indicador | Uso | Período |
+|-----------|-----|---------|
+| **EMA** | Tendencia | 12, 50, 200 |
+| **RSI** | Sobreventa/Sobrecompra | 14 |
+| **MACD** | Momentum | 12, 26, 9 |
+| **Bandas de Bollinger** | Volatilidad | 20, 2σ |
+| **ATR** | Stops dinámicos | 14 |
+| **ADX** | Fuerza de tendencia | 14 |
+
+### Señales de Trading
+
+**Compra:**
+- Tendencia alcista (EMA 12 > EMA 50 > EMA 200)
+- RSI < 30 (sobreventa)
+- MACD positivo
+- Volumen confirmado
+
+**Venta:**
+- Tendencia bajista (EMA 12 < EMA 50 < EMA 200)
+- RSI > 70 (sobrecompra)
+- MACD negativo
+- Volumen confirmado
+
+### Gestión de Riesgos
+
+- **Stop Loss**: Entrada - (ATR × 2)
+- **Take Profit 1**: Entrada + (ATR × 1.5) → 30% del volumen
+- **Take Profit 2**: Entrada + (ATR × 2.5) → 40% del volumen
+- **Take Profit 3**: Entrada + (ATR × 4.0) → 30% del volumen
+
+---
+
+## 📁 Estructura del Proyecto
+
+```
+kraken-trading-bot/
+├── trading_bot.py              # Bot principal
+├── kraken_client.py            # Cliente REST de Kraken
+├── technical_analysis.py       # Indicadores técnicos
+├── signal_generator.py         # Generador de señales
+├── risk_manager.py             # Gestor de riesgos
+├── download_historical_data.py # Descargador de datos
+├── backtest_with_real_data.py  # Backtester avanzado
+├── test_bot.py                 # Pruebas unitarias
+├── backtester.py               # Backtester básico
+├── bot_config.json             # Configuración
+├── requirements.txt            # Dependencias
+└── docs/                       # Documentación
+    ├── QUICK_START_5MIN.md
+    ├── STEP_BY_STEP.md
+    ├── IMPLEMENTATION_GUIDE.md
+    ├── BACKTESTING_GUIDE.md
+    └── ...
+```
+
+---
+
+## 📖 Documentación
+
+### Guías de Implementación
+
+| Guía | Descripción | Tiempo |
+|------|-------------|--------|
+| [QUICK_START_5MIN.md](QUICK_START_5MIN.md) | Inicio rápido | 5 min |
+| [STEP_BY_STEP.md](STEP_BY_STEP.md) | Paso a paso visual | 30 min |
+| [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md) | Guía completa | 1 hora |
+
+### Guías Técnicas
+
+| Guía | Descripción |
+|------|-------------|
+| [README.md](README.md) | Documentación técnica completa |
+| [SETUP_GUIDE.md](SETUP_GUIDE.md) | Configuración detallada |
+| [BACKTESTING_GUIDE.md](BACKTESTING_GUIDE.md) | Guía de backtesting |
+| [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) | Resumen del proyecto |
+
+---
+
+## 🔧 Requisitos
+
+### Software
+- Python 3.8 o superior
+- pip (gestor de paquetes)
+
+### Cuenta Kraken
+- Cuenta activa en [Kraken](https://www.kraken.com)
+- API Key con permisos:
+  - Query Funds
+  - Query Orders
+  - Create & Modify Orders
+  - Cancel Orders
+
+### Dependencias Python
+```
+requests>=2.31.0
+numpy>=1.24.0
+pandas>=2.0.0
+python-dotenv>=1.0.0
+```
+
+---
+
+## 🧪 Testing
+
+### Ejecutar Pruebas Unitarias
+
+```bash
+python test_bot.py
+```
+
+**Resultado esperado:**
+```
+Ran 19 tests in 0.020s
+OK
+```
+
+### Backtesting con Datos Reales
+
+```bash
+# Descargar datos históricos
+python download_historical_data.py
+
+# Ejecutar backtesting
+python backtest_with_real_data.py
+```
+
+---
+
+## 📈 Métricas de Rendimiento
+
+El bot calcula automáticamente:
+
+| Métrica | Descripción | Objetivo |
+|---------|-------------|----------|
+| **Win Rate** | % de operaciones ganadoras | > 45% |
+| **Profit Factor** | Ganancias / Pérdidas | > 1.5 |
+| **Sharpe Ratio** | Retorno ajustado por riesgo | > 1.0 |
+| **Max Drawdown** | Máxima pérdida desde pico | < 15% |
+| **Recovery Factor** | Ganancia / Drawdown | > 2.0 |
+
+---
+
+## ⚙️ Configuración
+
+### Parámetros Principales (bot_config.json)
+
+```json
+{
+  "trading_pairs": ["XBTUSD", "ETHUSD"],
+  "total_capital": 10000.0,
+  "risk_per_trade": 0.02,
+  "max_positions": 5,
+  "max_position_size": 0.10,
+  "max_drawdown": 0.15,
+  "min_confidence": 0.75,
+  "paper_trading": true
+}
+```
+
+**Recomendaciones:**
+- Empezar con `paper_trading: true`
+- Capital conservador: $1,000 - $10,000
+- Riesgo por trade: 1-2%
+- Máximo 2-5 posiciones simultáneas
+
+---
+
+## 🔐 Seguridad
+
+### Mejores Prácticas
+
+- ✅ Usar archivo `.env` para credenciales
+- ✅ Nunca compartir API keys
+- ✅ Habilitar 2FA en Kraken
+- ✅ Usar IP whitelist en Kraken
+- ✅ Limitar permisos de API key
+- ✅ Monitorear logs regularmente
+
+### Permisos de API Key
+
+**Habilitar:**
+- Query Funds
+- Query Open Orders
+- Query Closed Orders
+- Query Trades
+- Create & Modify Orders
+- Cancel/Close Orders
+
+**NO habilitar:**
+- Modify Settings
+- Withdraw Funds
+
+---
+
+## 📊 Ejemplo de Uso
+
+### Paper Trading
+
+```python
+# El bot ejecuta automáticamente en modo simulación
+python trading_bot.py
+```
+
+### Backtesting
+
+```python
+from backtest_with_real_data import RealDataBacktester
+
+# Crear backtester
+bt = RealDataBacktester(initial_capital=10000.0)
+
+# Descargar datos
+data = bt.download_data(
+    pairs=["XBTUSD", "ETHUSD"],
+    timeframe="1h",
+    days=90
+)
+
+# Ejecutar backtesting
+results = bt.run_backtest_multiple_pairs(data)
+
+# Generar resumen
+summary = bt.generate_summary_report()
+bt.print_summary_report(summary)
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### Problemas Comunes
+
+**"ModuleNotFoundError"**
+```bash
+pip install -r requirements.txt
+```
+
+**"API Key not found"**
+```bash
+# Verificar archivo .env
+cat .env
+```
+
+**"Connection refused"**
+```bash
+# Verificar conexión a internet
+ping api.kraken.com
+```
+
+**Ver más:** [IMPLEMENTATION_GUIDE.md - Troubleshooting](IMPLEMENTATION_GUIDE.md#troubleshooting)
+
+---
+
+## 📈 Estadísticas del Proyecto
+
+| Métrica | Valor |
+|---------|-------|
+| Líneas de Código | ~3,000+ |
+| Archivos Python | 8 |
+| Pruebas Unitarias | 19 |
+| Indicadores Técnicos | 6 |
+| Parámetros Configurables | 20+ |
+| Documentación | 9 archivos |
+
+---
+
+## 🗺️ Roadmap
+
+- [ ] WebSocket para datos en tiempo real
+- [ ] Machine learning para optimización
+- [ ] Dashboard web de monitoreo
+- [ ] Alertas por email/Telegram
+- [ ] Múltiples estrategias simultáneas
+- [ ] Análisis de sentimiento
+- [ ] Optimización automática de parámetros
+
+---
+
+## 🤝 Contribuir
+
+Las contribuciones son bienvenidas. Por favor:
+
+1. Fork el proyecto
+2. Crear una rama (`git checkout -b feature/nueva-funcionalidad`)
+3. Commit cambios (`git commit -am 'Agregar nueva funcionalidad'`)
+4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
+5. Crear Pull Request
+
+---
+
+## 📄 Licencia
+
+Este proyecto está bajo la Licencia MIT. Ver [LICENSE](LICENSE) para más detalles.
+
+---
+
+## ⚠️ Disclaimer
+
+Este bot es para propósitos educativos. El trading conlleva riesgos significativos de pérdida financiera. Use bajo su propio riesgo. Nunca invierta más de lo que pueda permitirse perder.
+
+**No somos asesores financieros.** Este software se proporciona "tal cual" sin garantías de ningún tipo.
+
+---
+
+## 📞 Soporte
+
+- **Issues**: [GitHub Issues](https://github.com/emiliojose1909/kraken-trading-bot/issues)
+- **Documentación**: Ver carpeta `docs/`
+- **Kraken API**: [docs.kraken.com](https://docs.kraken.com/rest/)
+
+---
+
+## 🙏 Agradecimientos
+
+- [Kraken](https://www.kraken.com) por su excelente API
+- Comunidad de trading algorítmico
+- Contribuidores del proyecto
+
+---
+
+## 📊 Badges
+
+![Python Version](https://img.shields.io/badge/Python-3.8%2B-blue)
+![Tests](https://img.shields.io/badge/Tests-19%20passed-success)
+![Code Size](https://img.shields.io/badge/Code-3000%2B%20lines-informational)
+![Docs](https://img.shields.io/badge/Docs-9%20guides-blue)
+
+---
+
+**Versión:** 1.0.0  
+**Fecha:** 2026-01-21  
+**Estado:** Producción
+
+---
+
+⭐ **Si este proyecto te ayudó, dale una estrella en GitHub!**

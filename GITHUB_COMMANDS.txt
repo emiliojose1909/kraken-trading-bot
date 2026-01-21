@@ -1,0 +1,38 @@
+# ========================================
+# COMANDOS PARA SUBIR A GITHUB
+# ========================================
+
+# PASO 1: Crear repositorio en GitHub
+# Ir a: https://github.com/new
+# Nombre: kraken-trading-bot
+# NO inicializar con README
+
+# PASO 2: Ejecutar estos comandos
+cd /home/ubuntu/kraken_bot
+git remote add origin https://github.com/emiliojose1909/kraken-trading-bot.git
+git push -u origin main
+
+# Si pide credenciales:
+# Username: emiliojose1909
+# Password: [Tu Personal Access Token]
+
+# ========================================
+# GENERAR TOKEN (si es necesario)
+# ========================================
+# 1. Ir a: https://github.com/settings/tokens
+# 2. Generate new token (classic)
+# 3. Seleccionar scope: repo
+# 4. Copiar el token
+# 5. Usar como password
+
+# ========================================
+# VERIFICAR
+# ========================================
+git remote -v
+git status
+git log --oneline
+
+# ========================================
+# URL DEL REPOSITORIO
+# ========================================
+# https://github.com/emiliojose1909/kraken-trading-bot
