@@ -377,7 +377,7 @@ class KrakenClient:
     def cancel_all_orders(self) -> Dict[str, Any]:
         """Cancelar todas las órdenes abiertas"""
         logger.warning("Cancelando TODAS las órdenes abiertas")
-        return self._request("POST", "/0/private/CancelAllOrders", {}, private=True)
+        return self._request("POST", "/0/private/CancelAll", {}, private=True)
     
     def amend_order(
         self,

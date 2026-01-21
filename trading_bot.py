@@ -12,6 +12,11 @@ from typing import Dict, Optional, List
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+# Cargar variables de entorno
+load_dotenv()
+
 from kraken_client import KrakenClient, KrakenConfig
 from technical_analysis import MarketDataProcessor, TechnicalIndicators
 from signal_generator import SignalGenerator, SignalType
@@ -44,6 +49,10 @@ class TradingBot:
             config_file: Ruta del archivo de configuración
         """
         self.config = self._load_config(config_file)
+        
+        # Configurar nivel de log dinámicamente según config
+        log_level_name = self.config.get("logging_level", "INFO").upper()
+        logging.getLogger().setLevel(getattr(logging, log_level_name, logging.INFO))
         
         # Inicializar componentes
         self.kraken_client = self._init_kraken_client()
@@ -224,7 +233,19 @@ class TradingBot:
             
             # Obtener precio actual
             ticker = self.kraken_client.get_ticker(pair)
-            current_price = float(ticker[pair]["c"][0])
+            
+            # Manejar mapeo de nombres en ticker
+            ticker_key = pair
+            if pair not in ticker:
+                 possible_keys = list(ticker.keys())
+                 if possible_keys:
+                     ticker_key = possible_keys[0]
+                     logger.debug(f"Mapeando ticker {pair} a {ticker_key}")
+                 else:
+                     logger.warning(f"No se encontró ticker para {pair}")
+                     return
+
+            current_price = float(ticker[ticker_key]["c"][0])
             
             # Generar señal
             signal = self.signal_generator.generate_signal(
@@ -232,6 +253,10 @@ class TradingBot:
                 current_price,
                 atr_multiplier=self.config.get("atr_multiplier", 2.0)
             )
+            
+            # Feedback visual para el usuario
+            signal_desc = signal.type.value if signal else "NEUTRAL"
+            logger.info(f"Análisis {pair}: Precio=${current_price:.2f} | Señal={signal_desc}")
             
             if signal:
                 self._handle_signal(pair, signal, current_price)
@@ -253,12 +278,21 @@ class TradingBot:
             # Obtener datos OHLC de 5 minutos
             ohlc_data = self.kraken_client.get_ohlc(pair, interval=5)
             
+            # Identificar la clave correcta (Kraken puede usar nombres canónicos como XXBTZUSD)
+            data_key = pair
             if pair not in ohlc_data:
-                return None
+                # Buscar cualquier clave que no sea 'last'
+                possible_keys = [k for k in ohlc_data.keys() if k != 'last']
+                if possible_keys:
+                    data_key = possible_keys[0]
+                    logger.debug(f"Mapeando par solicitado {pair} a respuesta {data_key}")
+                else:
+                    logger.warning(f"No se encontraron datos para {pair}. Claves: {list(ohlc_data.keys())}")
+                    return None
             
             # Convertir a formato esperado [time, open, high, low, close, volume]
             ohlcv_list = []
-            for candle in ohlc_data[pair]:
+            for candle in ohlc_data[data_key]:
                 ohlcv_list.append([
                     candle[0],  # time
                     float(candle[1]),  # open

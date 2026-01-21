@@ -1,1 +1,23 @@
-{\n  \"trading_pairs\": [\n    \"XBTUSD\",\n    \"ETHUSD\",\n    \"XRPUSD\"\n  ],\n  \"timeframe_minutes\": 5,\n  \"total_capital\": 10000.0,\n  \"risk_per_trade\": 0.02,\n  \"max_positions\": 5,\n  \"max_position_size\": 0.10,\n  \"max_drawdown\": 0.15,\n  \"max_consecutive_losses\": 3,\n  \"rsi_oversold\": 30.0,\n  \"rsi_overbought\": 70.0,\n  \"adx_threshold\": 25.0,\n  \"volume_threshold\": 1.1,\n  \"min_confidence\": 0.75,\n  \"min_signal_interval_minutes\": 5,\n  \"atr_multiplier\": 2.0,\n  \"paper_trading\": true,\n  \"logging_level\": \"INFO\"\n}\n
+{
+  "trading_pairs": [
+    "XBTUSD",
+    "ETHUSD",
+    "XRPUSD"
+  ],
+  "timeframe_minutes": 5,
+  "total_capital": 10000.0,
+  "risk_per_trade": 0.02,
+  "max_positions": 5,
+  "max_position_size": 0.10,
+  "max_drawdown": 0.15,
+  "max_consecutive_losses": 3,
+  "rsi_oversold": 30.0,
+  "rsi_overbought": 70.0,
+  "adx_threshold": 25.0,
+  "volume_threshold": 1.1,
+  "min_confidence": 0.75,
+  "min_signal_interval_minutes": 5,
+  "atr_multiplier": 2.0,
+  "paper_trading": false,
+  "logging_level": "DEBUG"
+}
