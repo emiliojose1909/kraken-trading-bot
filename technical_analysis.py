@@ -103,9 +103,13 @@ class TechnicalAnalysis:
         up = seed[seed >= 0].sum() / period
         down = -seed[seed < 0].sum() / period
         
-        rs = up / down if down != 0 else 0
+        rs = up / down if down != 0 else float('inf')
         rsi = np.zeros_like(data)
-        rsi[:period] = 100.0 - 100.0 / (1.0 + rs)
+        
+        if down == 0:
+            rsi[:period] = 100.0
+        else:
+            rsi[:period] = 100.0 - 100.0 / (1.0 + rs)
         
         for i in range(period, len(data)):
             delta = deltas[i-1]
@@ -120,8 +124,11 @@ class TechnicalAnalysis:
             up = (up * (period - 1) + upval) / period
             down = (down * (period - 1) + downval) / period
             
-            rs = up / down if down != 0 else 0
-            rsi[i] = 100.0 - 100.0 / (1.0 + rs)
+            if down == 0:
+                rsi[i] = 100.0
+            else:
+                rs = up / down
+                rsi[i] = 100.0 - 100.0 / (1.0 + rs)
         
         return rsi
     
@@ -258,7 +265,8 @@ class TechnicalAnalysis:
         # ADX es SMA del DX
         adx = TechnicalAnalysis.calculate_sma(dx, period)
         
-        return adx
+        # Pad with NaN at the beginning to match input length (lost 1 due to diff)
+        return np.concatenate(([np.nan], adx))
     
     @staticmethod
     def analyze_candle(

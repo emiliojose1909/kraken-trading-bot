@@ -295,7 +295,8 @@ class TestRiskManager(unittest.TestCase):
                 take_profit_2=48000.0,
                 take_profit_3=50000.0
             )
-            self.manager.close_position_partial(f"test_stat_{i}", 1, 46500.0)
+            # Fully close the position to register it in statistics
+            self.manager.close_position_stop_loss(f"test_stat_{i}", 46500.0)
         
         stats = self.manager.get_statistics()
         self.assertGreater(stats["total_trades"], 0)
