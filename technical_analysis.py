@@ -23,6 +23,7 @@ class TechnicalIndicators:
     macd: float
     macd_signal: float
     macd_histogram: float
+    macd_histogram_prev: float
     bb_upper: float
     bb_middle: float
     bb_lower: float
@@ -30,6 +31,7 @@ class TechnicalIndicators:
     adx_14: float
     volume_ma: float
     current_volume: float
+    close: float
 
 
 class TechnicalAnalysis:
@@ -372,13 +374,15 @@ class MarketDataProcessor:
             macd=macd[-1],
             macd_signal=macd_signal[-1],
             macd_histogram=macd_histogram[-1],
+            macd_histogram_prev=macd_histogram[-2],
             bb_upper=bb_upper[-1],
             bb_middle=bb_middle[-1],
             bb_lower=bb_lower[-1],
             atr_14=atr_14,
             adx_14=adx_14,
             volume_ma=volume_ma,
-            current_volume=current_volume
+            current_volume=current_volume,
+            close=close[-1]
         )
     
     def get_trend(self, indicators: TechnicalIndicators) -> str:
