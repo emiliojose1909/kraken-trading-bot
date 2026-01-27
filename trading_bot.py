@@ -20,7 +20,7 @@ load_dotenv()
 from kraken_client import KrakenClient, KrakenConfig
 from technical_analysis import MarketDataProcessor, TechnicalIndicators
 from signal_generator import SignalGenerator, SignalType
-from risk_manager import RiskManager, RiskConfig
+from risk_manager import RiskManager, RiskConfig, PositionStatus
 
 
 # Configuración de logging
@@ -56,6 +56,17 @@ class TradingBot:
         
         # Inicializar componentes
         self.kraken_client = self._init_kraken_client()
+        
+        # Obtener saldo real si es posible, sino usar configuración
+        try:
+            balance = self.kraken_client.get_account_balance()
+            real_balance = float(balance.get('ZUSD', balance.get('USD', 0.0)))
+            if real_balance > 0:
+                logger.info(f"Usando saldo real de cuenta: ${real_balance:.2f}")
+                self.config['total_capital'] = real_balance
+        except Exception as e:
+            logger.warning(f"No se pudo obtener saldo inicial: {e}")
+
         self.signal_generator = SignalGenerator(
             rsi_oversold=self.config.get("rsi_oversold", 30.0),
             rsi_overbought=self.config.get("rsi_overbought", 70.0),
@@ -72,6 +83,10 @@ class TradingBot:
             max_drawdown=self.config.get("max_drawdown", 0.15)
         )
         self.risk_manager = RiskManager(risk_config)
+
+        # Sincronizar posiciones si es trading real
+        if not self.config.get("paper_trading", True):
+            self._sync_positions_with_exchange()
         
         # Estado del bot
         self.is_running = False
@@ -201,6 +216,172 @@ class TradingBot:
         self.kraken_client.close()
         logger.info("Bot detenido")
     
+    def _sync_positions_with_exchange(self):
+        """
+        Sincronizar posiciones internas con los saldos reales en Kraken.
+        Recupera operaciones pasadas que aún no se han vendido.
+        """
+        logger.info("Iniciando sincronización de posiciones con Kraken...")
+        try:
+            # 1. Obtener saldo de todos los activos
+            balance = self.kraken_client.get_account_balance()
+            logger.info(f"Saldos encontrados: {balance}")
+            
+            # 2. Obtener historial de trades reciente para encontrar precios de entrada
+            trades_history = self.kraken_client.get_trades_history()
+            trades = trades_history.get('trades', {})
+            logger.info(f"Historial de trades recuperado: {len(trades)} operaciones")
+            
+            # Debug: imprimir primeros trades para verificar estructura
+            count = 0
+            for txid, trade in trades.items():
+                if count < 3:
+                    logger.debug(f"Trade sample: {trade}")
+                    count += 1
+            
+            # 3. Analizar cada par configurado
+            for pair in self.config.get("trading_pairs", []):
+                # Determinar activo base (ej. ETHUSD -> XETH, XBTUSD -> XXBT)
+                # Kraken usa prefijos X para cripto y Z para fiat a veces, o nombres cortos
+                # Intentamos adivinar el activo base del par
+                base_asset = None
+                if pair.endswith("USD"):
+                    asset_name = pair[:-3] # ETH, XBT, XRP
+                    # Buscar en balance con posibles variaciones
+                    candidates = [asset_name, f"X{asset_name}", f"Z{asset_name}"]
+                    if asset_name == "XBT": candidates.append("XXBT")
+                    
+                    for cand in candidates:
+                        if cand in balance and float(balance[cand]) > 0.001: # Umbral mínimo
+                            base_asset = cand
+                            break
+                
+                if not base_asset:
+                    continue
+                    
+                amount = float(balance[base_asset])
+                logger.info(f"Detectado saldo de {amount} {base_asset} para par {pair}")
+                
+                # Verificar si ya tenemos esta posición trackeada
+                existing_position = False
+                for pos in self.risk_manager.positions.values():
+                    if pos.pair == pair and pos.status == PositionStatus.OPEN:
+                        existing_position = True
+                        break
+                
+                if existing_position:
+                    logger.info(f"Posición para {pair} ya está trackeada internamente.")
+                    continue
+                
+                # Buscar último trade de compra para este par
+                last_buy_price = 0.0
+                last_buy_time = datetime.now()
+                
+                # Ordenar trades por tiempo descendente
+                sorted_trades = sorted(
+                    trades.items(), 
+                    key=lambda x: x[1]['time'], 
+                    reverse=True
+                )
+                
+                for txid, trade in sorted_trades:
+                    # Verificar si el trade corresponde al par (puede haber variaciones de nombre)
+                    # El trade['pair'] suele ser el nombre canónico (XXBTZUSD)
+                    trade_pair = trade.get('pair')
+                    
+                    # Normalización robusta para Kraken (ej. ETHUSD vs XETHZUSD)
+                    # Verificamos si el activo base (ej. ETH) y la cotizada (ej. USD) están en el nombre del par del trade
+                    asset_part = pair[:-3] # ETH
+                    quote_part = pair[-3:] # USD
+                    
+                    is_same_pair = (pair in trade_pair) or \
+                                   (trade_pair in pair) or \
+                                   (asset_part in trade_pair and quote_part in trade_pair)
+                                   
+                    if is_same_pair and trade.get('type') == 'buy':
+                        last_buy_price = float(trade.get('price', 0))
+                        last_buy_time = datetime.fromtimestamp(trade.get('time'))
+                        logger.info(f"Encontrada última compra de {pair} ({trade_pair}): Precio {last_buy_price} fecha {last_buy_time}")
+                        break
+                
+                if last_buy_price > 0:
+                    # Reconstruir posición
+                    logger.info(f"Recuperando posición histórica para {pair}")
+                    
+                    # Calcular SL y TP estimados basados en config actual
+                    # Asumimos riesgo estándar ya que perdimos la señal original
+                    atr_multiplier = self.config.get("atr_multiplier", 2.0)
+                    # Estimación simple de SL a 2% si no tenemos ATR
+                    stop_loss_pct = 0.02 
+                    
+                    stop_loss = last_buy_price * (1 - stop_loss_pct)
+                    take_profit_1 = last_buy_price * (1 + (stop_loss_pct * 1.5))
+                    take_profit_2 = last_buy_price * (1 + (stop_loss_pct * 2.5))
+                    take_profit_3 = last_buy_price * (1 + (stop_loss_pct * 3.5))
+                    
+                    position_id = f"recovered_{pair}_{int(last_buy_time.timestamp())}"
+                    
+                    self.risk_manager.open_position(
+                        position_id=position_id,
+                        pair=pair,
+                        side="buy",
+                        entry_price=last_buy_price,
+                        volume=amount,
+                        stop_loss=stop_loss,
+                        take_profit_1=take_profit_1,
+                        take_profit_2=take_profit_2,
+                        take_profit_3=take_profit_3
+                    )
+                    # Ajustar fecha real
+                    if position_id in self.risk_manager.positions:
+                        self.risk_manager.positions[position_id].entry_time = last_buy_time
+                        self.risk_manager.save_state()
+                
+                else:
+                    # FALLBACK: Si hay saldo pero no encontramos el trade, usamos precio actual
+                    # Esto asegura que la posición sea gestionada aunque no sepamos el precio exacto de entrada
+                    logger.warning(f"Saldo encontrado en {pair} pero sin historial de compra reciente. Usando precio actual como referencia.")
+                    
+                    try:
+                        ticker = self.kraken_client.get_ticker(pair)
+                        # Mapeo de ticker key si es necesario
+                        ticker_key = pair
+                        if pair not in ticker:
+                            possible = list(ticker.keys())
+                            if possible: ticker_key = possible[0]
+                            
+                        current_price = float(ticker[ticker_key]["c"][0])
+                        
+                        last_buy_price = current_price
+                        last_buy_time = datetime.now()
+                        
+                        stop_loss_pct = 0.02
+                        stop_loss = last_buy_price * (1 - stop_loss_pct)
+                        take_profit_1 = last_buy_price * (1 + (stop_loss_pct * 1.5))
+                        take_profit_2 = last_buy_price * (1 + (stop_loss_pct * 2.5))
+                        take_profit_3 = last_buy_price * (1 + (stop_loss_pct * 3.5))
+                        
+                        position_id = f"recovered_fallback_{pair}_{int(last_buy_time.timestamp())}"
+                        
+                        self.risk_manager.open_position(
+                            position_id=position_id,
+                            pair=pair,
+                            side="buy",
+                            entry_price=last_buy_price,
+                            volume=amount,
+                            stop_loss=stop_loss,
+                            take_profit_1=take_profit_1,
+                            take_profit_2=take_profit_2,
+                            take_profit_3=take_profit_3
+                        )
+                        self.risk_manager.save_state()
+                        
+                    except Exception as e:
+                        logger.error(f"Error creando posición fallback para {pair}: {e}")
+                        
+        except Exception as e:
+            logger.error(f"Error sincronizando posiciones: {e}")
+
     def _trading_cycle(self):
         """
         Ejecutar un ciclo de trading.
@@ -255,7 +436,7 @@ class TradingBot:
             )
             
             # Feedback visual para el usuario
-            signal_desc = signal.type.value if signal else "NEUTRAL"
+            signal_desc = signal.signal_type.value if signal else "NEUTRAL"
             logger.info(f"Análisis {pair}: Precio=${current_price:.2f} | Señal={signal_desc}")
             
             if signal:
@@ -324,6 +505,21 @@ class TradingBot:
             return
         
         if signal.signal_type == SignalType.BUY:
+            # Verificar saldo real antes de procesar compra
+            if not self.config.get("paper_trading", True):
+                try:
+                    balance = self.kraken_client.get_account_balance()
+                    usd_balance = float(balance.get('ZUSD', balance.get('USD', 0.0)))
+                    # Kraken requiere un volumen mínimo que suele ser > $1-2 USD dependiendo del par
+                    if usd_balance < 2.0: 
+                        logger.info(f"Saldo insuficiente (${usd_balance:.2f}) para nueva compra. Ignorando señal.")
+                        return
+                    
+                    # Actualizar capital en risk manager para este cálculo
+                    self.risk_manager.config.total_capital = usd_balance
+                except Exception as e:
+                    logger.warning(f"No se pudo verificar saldo antes de operar: {e}")
+
             self._execute_buy_signal(pair, signal, current_price)
         elif signal.signal_type == SignalType.SELL:
             self._execute_sell_signal(pair, signal, current_price)
@@ -383,6 +579,19 @@ class TradingBot:
                     price=signal.entry_price
                 )
                 logger.info(f"Orden de COMPRA ejecutada: {result}")
+                
+                # Registrar posición en el gestor de riesgo para seguimiento
+                self.risk_manager.open_position(
+                    position_id=position_id,
+                    pair=pair,
+                    side="buy",
+                    entry_price=signal.entry_price,
+                    volume=volume,
+                    stop_loss=signal.stop_loss,
+                    take_profit_1=signal.take_profit_1,
+                    take_profit_2=signal.take_profit_2,
+                    take_profit_3=signal.take_profit_3
+                )
             except Exception as e:
                 logger.error(f"Error ejecutando orden de compra: {e}")
     
@@ -453,21 +662,58 @@ class TradingBot:
             try:
                 # Obtener precio actual
                 ticker = self.kraken_client.get_ticker(position.pair)
-                current_price = float(ticker[position.pair]["c"][0])
+                
+                # Manejar mapeo de nombres en ticker
+                ticker_key = position.pair
+                if position.pair not in ticker:
+                     possible_keys = list(ticker.keys())
+                     if possible_keys:
+                         ticker_key = possible_keys[0]
+                     else:
+                         logger.warning(f"No se encontró ticker para {position.pair}")
+                         continue
+
+                current_price = float(ticker[ticker_key]["c"][0])
                 
                 # Actualizar precio
                 self.risk_manager.update_position_price(position_id, current_price)
                 
                 # Verificar stop loss
                 if self.risk_manager.check_stop_loss(position_id, current_price):
-                    self.risk_manager.close_position_stop_loss(position_id, current_price)
+                    volume_closed = self.risk_manager.close_position_stop_loss(position_id, current_price)
                     logger.warning(f"Stop loss ejecutado: {position_id}")
+                    
+                    # Ejecutar venta real si aplica
+                    if not self.config.get("paper_trading", True) and volume_closed > 0:
+                        try:
+                            self.kraken_client.add_order(
+                                pair=position.pair,
+                                side="sell" if position.side == "buy" else "buy",
+                                ordertype="market",
+                                volume=volume_closed
+                            )
+                            logger.info(f"Orden de STOP LOSS enviada a Kraken para {position.pair}")
+                        except Exception as e:
+                            logger.error(f"Error ejecutando STOP LOSS en Kraken: {e}")
                 
                 # Verificar take profit
                 tp_level, reached = self.risk_manager.check_take_profit(position_id, current_price)
                 if reached:
-                    self.risk_manager.close_position_partial(position_id, tp_level, current_price)
+                    volume_closed = self.risk_manager.close_position_partial(position_id, tp_level, current_price)
                     logger.info(f"Take profit {tp_level} ejecutado: {position_id}")
+
+                    # Ejecutar venta real si aplica
+                    if not self.config.get("paper_trading", True) and volume_closed > 0:
+                        try:
+                            self.kraken_client.add_order(
+                                pair=position.pair,
+                                side="sell" if position.side == "buy" else "buy",
+                                ordertype="market",
+                                volume=volume_closed
+                            )
+                            logger.info(f"Orden de TAKE PROFIT enviada a Kraken para {position.pair}")
+                        except Exception as e:
+                            logger.error(f"Error ejecutando TAKE PROFIT en Kraken: {e}")
             
             except Exception as e:
                 logger.error(f"Error monitoreando posición {position_id}: {e}")

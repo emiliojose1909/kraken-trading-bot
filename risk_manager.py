@@ -4,8 +4,10 @@ Implementa gestión de capital, stops dinámicos y control de riesgo.
 """
 
 import logging
+import json
+import os
 from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from enum import Enum
 
@@ -103,7 +105,62 @@ class RiskManager:
         self.consecutive_losses = 0
         self.total_realized_pnl = 0.0
         self.peak_capital = config.total_capital
+        
+        # Cargar estado previo si existe
+        self.load_state()
+        
         logger.info(f"Gestor de riesgos inicializado con capital: {config.total_capital}")
+
+    def save_state(self):
+        """Guardar estado actual a archivo"""
+        try:
+            state = {
+                "positions": {
+                    pid: {
+                        **asdict(pos),
+                        "entry_time": pos.entry_time.isoformat(),
+                        "status": pos.status.value
+                    }
+                    for pid, pos in self.positions.items()
+                },
+                "consecutive_losses": self.consecutive_losses,
+                "total_realized_pnl": self.total_realized_pnl
+            }
+            
+            with open("bot_state.json", 'w') as f:
+                json.dump(state, f, indent=2)
+                
+        except Exception as e:
+            logger.error(f"Error guardando estado: {e}")
+
+    def load_state(self):
+        """Cargar estado desde archivo"""
+        if not os.path.exists("bot_state.json"):
+            return
+            
+        try:
+            with open("bot_state.json", 'r') as f:
+                state = json.load(f)
+                
+            # Cargar posiciones
+            for pid, pos_data in state.get("positions", {}).items():
+                # Reconstruir datetime
+                if "entry_time" in pos_data and isinstance(pos_data["entry_time"], str):
+                    pos_data["entry_time"] = datetime.fromisoformat(pos_data["entry_time"])
+                
+                # Reconstruir Enum
+                if "status" in pos_data and isinstance(pos_data["status"], str):
+                    pos_data["status"] = PositionStatus(pos_data["status"])
+                
+                self.positions[pid] = Position(**pos_data)
+                
+            self.consecutive_losses = state.get("consecutive_losses", 0)
+            self.total_realized_pnl = state.get("total_realized_pnl", 0.0)
+            
+            logger.info(f"Estado recuperado: {len(self.positions)} posiciones abiertas")
+            
+        except Exception as e:
+            logger.error(f"Error cargando estado: {e}")
     
     def can_open_position(self) -> Tuple[bool, str]:
         """
@@ -217,6 +274,9 @@ class RiskManager:
         )
         
         self.positions[position_id] = position
+        
+        self.save_state()  # Guardar estado
+        
         logger.info(
             f"Posición abierta: {position_id} {side.upper()} {volume} {pair} @ {entry_price} "
             f"SL: {stop_loss} TP1: {take_profit_1}"
@@ -355,6 +415,7 @@ class RiskManager:
         else:
             position.status = PositionStatus.PARTIALLY_CLOSED
         
+        self.save_state()  # Guardar estado
         return volume_to_close
     
     def close_position_stop_loss(
@@ -402,6 +463,7 @@ class RiskManager:
             f"PnL: {pnl:.2f}"
         )
         
+        self.save_state()  # Guardar estado
         return volume_to_close
     
     def _move_to_closed(self, position_id: str):
