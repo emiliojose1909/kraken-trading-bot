@@ -106,17 +106,17 @@ class SignalGenerator:
             True si la tendencia está confirmada
         """
         if trend == "UPTREND":
-            # Verificar alineación de EMAs
-            ema_aligned = indicators.ema_12 > indicators.ema_50 > indicators.ema_200
-            # Verificar fuerza de tendencia
-            trend_strong = indicators.adx_14 > self.adx_threshold
+            # Verificar alineación de EMAs o precio sobre EMA 200 (más flexible)
+            ema_aligned = (indicators.ema_12 > indicators.ema_50) or (indicators.close > indicators.ema_200)
+            # Verificar fuerza de tendencia (umbral reducido)
+            trend_strong = indicators.adx_14 > (self.adx_threshold - 5.0)
             return ema_aligned and trend_strong
         
         elif trend == "DOWNTREND":
-            # Verificar alineación de EMAs
-            ema_aligned = indicators.ema_12 < indicators.ema_50 < indicators.ema_200
+            # Verificar alineación de EMAs o precio bajo EMA 200
+            ema_aligned = (indicators.ema_12 < indicators.ema_50) or (indicators.close < indicators.ema_200)
             # Verificar fuerza de tendencia
-            trend_strong = indicators.adx_14 > self.adx_threshold
+            trend_strong = indicators.adx_14 > (self.adx_threshold - 5.0)
             return ema_aligned and trend_strong
         
         return False
@@ -137,17 +137,17 @@ class SignalGenerator:
             True si hay señal de momentum
         """
         if signal_type == SignalType.BUY:
-            # RSI en sobreventa o cruzando arriba
-            rsi_signal = indicators.rsi_14 < 40.0
-            # MACD cruzando arriba
-            macd_signal = indicators.macd_histogram > 0
+            # RSI en zona de compra (usando configuración)
+            rsi_signal = indicators.rsi_14 < (self.rsi_oversold + 10.0) # Margen de +10 para ser más agresivo
+            # MACD con histograma positivo o subiendo
+            macd_signal = indicators.macd_histogram > 0 or (indicators.macd_histogram > indicators.macd_histogram_prev)
             return rsi_signal and macd_signal
         
         elif signal_type == SignalType.SELL:
-            # RSI en sobrecompra o cruzando abajo
-            rsi_signal = indicators.rsi_14 > 60.0
-            # MACD cruzando abajo
-            macd_signal = indicators.macd_histogram < 0
+            # RSI en zona de venta (usando configuración)
+            rsi_signal = indicators.rsi_14 > (self.rsi_overbought - 10.0) # Margen de -10
+            # MACD con histograma negativo o bajando
+            macd_signal = indicators.macd_histogram < 0 or (indicators.macd_histogram < indicators.macd_histogram_prev)
             return rsi_signal and macd_signal
         
         return False
